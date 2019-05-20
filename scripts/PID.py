@@ -3,9 +3,6 @@ from time import sleep
 import numpy as np
 import tkinter as tk
 
-from tkinter import *
-from tkinter import messagebox
-from tkinter import ttk
 import logging
 import datetime
 
@@ -29,15 +26,15 @@ class Config():
 		if "KP" in keys:
 			self.KP = kwargs.get("KP")
 		else:
-			self.KP = 0.8
+			self.KP = 0
 		if "KI" in keys:
 			self.KI = kwargs.get("KI")
 		else:
-			self.KI = 0.02
+			self.KI = 0
 		if "KD" in keys:
 			self.KD = kwargs.get("KD")
 		else:
-			self.KD = 0.01
+			self.KD = 0
 		if "windup" in keys:
 			self.windup = kwargs.get("windup")
 		else:
@@ -69,7 +66,7 @@ class Error():
 		else:
 			self.sum += self.sum
 
-class BeamNG_PID_Test():
+class BeamNG_Cruise_Controller_Test():
 	def __init__(self, **kwargs):
 		keys = kwargs.keys()
 		if "test_controller" in keys:
@@ -133,16 +130,24 @@ class BeamNG_PID_Test():
 		self.bng.start_scenario()
 		self.controller.start()
 		while self.controller.ended==False:
+			start_time = datetime.datetime.now()
 			sensors = self.bng.poll_sensors(self.vehicle)
 			wheelspeed = sensors['electrics']['values']['wheelspeed']
-			value = self.controller.calculate_PID_with_logs(wheelspeed)
-			value = max(min(1, value), 0)
-			self.vehicle.control(throttle=value)
+			value = self.controller.calculate_speed_with_logs(wheelspeed)
+			if value <= 0:
+				value = max(-1, value -0.1) * -1
+				self.vehicle.control(brake=value)
+			else:
+				value = min(1, value)
+				self.vehicle.control(throttle=value)
+			elapsed_time = datetime.datetime.now() - start_time
+			while (elapsed_time.total_seconds() * 1000) < 75:
+				elapsed_time = datetime.datetime.now() - start_time
 		print("Ending Test")
 		self.bng.close()
 
 
-class PID_Controller_Test():
+class Cruise_Controller_Test():
 	def __init__(self, **kwargs):
 		keys = kwargs.keys()
 		if "controller" in keys:
@@ -199,7 +204,7 @@ class PID_Controller_Test():
 			f.write(formatLog(elapsed_time, wheel_speed, self.targets[self.target_index]) + '\n')
 		print(formatLog(elapsed_time, wheel_speed, self.targets[self.target_index]))
 
-	def calculate_PID_with_logs(self, wheel_speed):
+	def calculate_speed_with_logs(self, wheel_speed):
 		if self.started and self.ended==False:
 			elapsed_time = self.calculateElapsed()
 			end_time = sum(self.target_times[0:self.target_index + 1])
@@ -216,7 +221,7 @@ class PID_Controller_Test():
 					print("Next target speed = {0}".format(self.targets[self.target_index]))
 					print("Timer was late by {0}.{1:06d} sec".format(seconds_error, elapsed_time.microseconds))
 			self.logSpeed(wheel_speed, elapsed_time)
-			return self.controller.calculate_PID(wheel_speed)
+			return self.controller.calculate_speed(wheel_speed)
 		else:
 			print("Ended or not started yet")
 			return 0
@@ -236,7 +241,7 @@ class PID_Controller():
 	def changeTarget(self, target):
 		self.config.target = target
 
-	def calculate_PID(self, wheel_speed):
+	def calculate_speed(self, wheel_speed):
 		# Error
 		self.error.new(self.config.target - wheel_speed)
 		self.error.calculateSum(self.config.windup)
@@ -248,44 +253,28 @@ class PID_Controller():
 		d = self.config.KD * self.error.prev
 		return p + i + d
 
+class On_Off_Controller():
+	def __init__(self, **kwargs):
+		keys = kwargs.keys()
+		if "config" in keys:
+			self.config = kwargs.get("config")
+		else:
+			self.config = Config()
+		if "error" in keys:
+			self.error = kwargs.get("error")
+		else:
+			self.error = Error()
+	def changeTarget(self, target):
+		self.config.target = target
 
-
-## WIP change control speed during simulation
-##class CruiseControl(object):
-##	  def __init__(self, interval=1):
-##			  """ Constructor
-##			  :type interval: int
-##			  :param interval: Check interval, in seconds
-##			  """
-##			  self.interval = interval
-##
-##			  thread = threading.Thread(target=self.run, args=())
-##			  thread.daemon = True							  # Daemonize thread
-##			  thread.start()								  # Start the execution
-##			  
-##			  TARGET = 16;
-##			  
-##
-##	  
-##
-##	  def run(self):
-##		  while True:
-##			  t=0;
-##		  
+	def calculate_speed(self, wheel_speed):
+		if wheel_speed > self.config.target:
+			return 0
+		else:
+			return 1
 
 def main():
-
-
-		# Logging in separate window
-		# root = Tk()
-		#
-		# T = Text(root)
-		# logging = WidgetLogger(T)
-		# root.update_idletasks()
-		# root.update()
-
-		# Read target speed first time
-
+		#If multiple Target Speeds are set, same amount of Test Times have to be specified
 
 		s_in = input('Set Speed (m/s)--> ')
 		s_list = s_in.split(",")
@@ -294,18 +283,21 @@ def main():
 		t_in = input('Set Test Time (sec) --> ')
 		t_list = t_in.split(",")
 		t = list(map(int, t_list))
-		config = Config(KI=0.2,KD=0.1)
-		controller = PID_Controller(config=config)
-		test_controller = PID_Controller_Test(controller=controller, targets=s, target_times=t)
-		test = BeamNG_PID_Test(test_controller=test_controller, testing_times=2, test_name="BeamNG_PID_test")
+		KP_in = input('Enter KP --> ')
+		KI_in = input('Enter KI --> ')
+		KD_in = input('Enter KD --> ')
+		test_count = input('How many tests to perform? --> ')
+		test_name_in = input('Test name for log files --> ')
+		if KP_in == 0 and KI_in == 0 and KD_in == 0:
+			config = Config()
+			controller = On_Off_Controller(config=config)
+		else:
+			config = Config(KP=KP_in,KI=KI_in,KD=KD_in)
+			controller = PID_Controller(config=config)
+		test_controller = Cruise_Controller_Test(controller=controller, targets=s, target_times=t)
+		test = BeamNG_Cruise_Controller_Test(test_controller=test_controller, testing_times=test_count,
+		test_name="BeamNG_test_{0}".format(test_name_in))
 		test.run()
-
-		#vehicle.ai_set_mode('span')
-		#vehicle.ai_set_speed(16,mode='set')
-		
-		# Print all available "electrics" sensors
-		#for i in sensors: 
-		#	  print (i, sensors[i])
 
 
 def formatLog(elapsed_time, wheel_speed, target):
