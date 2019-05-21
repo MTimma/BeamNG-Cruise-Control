@@ -126,7 +126,7 @@ class BeamNG_Cruise_Controller_Test():
 		self.bng.start_scenario()
 		for speed in self.targets:
 			self.controller.setTarget(speed)
-			self.controller.setTime(float(900/speed))
+			self.controller.setTime(float(800/speed))
 			self.runTestsOfType("up_{0}_".format(speed), (406.787, 690.0 + float(100*(speed/10)), 0), (0, 0, 0))
 			self.runTestsOfType("straight_{0}_".format(speed), (406.787, 690.0 + float(100*(speed/10)), 0), (0, 0, 180))
 			self.runTestsOfType("down_{0}_".format(speed), (406.787, 257.871 - float(100*(speed/10)), 101), (0, 0, 180))
