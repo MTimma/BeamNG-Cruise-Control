@@ -93,7 +93,7 @@ class BeamNG_Cruise_Controller_Test():
 		
 
 		# Create a scenario in test map
-		scenario = Scenario('GridMap', 'example')
+		scenario = Scenario('cruise-control', 'example')
 
 		# Create an ETK800 with the licence plate 'PID'
 		self.vehicle = Vehicle('ego_vehicle', model='etk800', licence='PID')
@@ -103,8 +103,8 @@ class BeamNG_Cruise_Controller_Test():
 
 		# Add it to our scenario at this position and rotation
 		# scenario.add_vehicle(vehicle, pos=(-717, 101, 118), rot=(0, 0, 45))
-		scenario.add_vehicle(self.vehicle, pos=(19.1315, 122.978, 0.163609),
-							 rot=(0, 0, 0))	 # spawn point for maps GridMap, GridMap2
+		scenario.add_vehicle(self.vehicle, pos=(406.787, 815.518, 0.214847),
+							 rot=(1, 0, 0))	 # spawn point for maps GridMap, GridMap2
 
 		# Place files defining our scenario for the simulator to read
 		scenario.make(self.bng)
@@ -137,11 +137,13 @@ class BeamNG_Cruise_Controller_Test():
 			if value <= 0:
 				value = max(-1, value -0.1) * -1
 				self.vehicle.control(brake=value)
+				self.vehicle.control(throttle=0)
 			else:
 				value = min(1, value)
+				self.vehicle.control(brake=0)
 				self.vehicle.control(throttle=value)
 			elapsed_time = datetime.datetime.now() - start_time
-			while (elapsed_time.total_seconds() * 1000) < 75:
+			while (elapsed_time.total_seconds() * 1000) < 100:
 				elapsed_time = datetime.datetime.now() - start_time
 		print("Ending Test")
 		self.bng.close()
@@ -283,10 +285,11 @@ def main():
 		t_in = input('Set Test Time (sec) --> ')
 		t_list = t_in.split(",")
 		t = list(map(int, t_list))
-		KP_in = input('Enter KP --> ')
-		KI_in = input('Enter KI --> ')
-		KD_in = input('Enter KD --> ')
-		test_count = input('How many tests to perform? --> ')
+		KP_in = float(input('Enter KP --> '))
+
+		KI_in = float(input('Enter KI --> '))
+		KD_in = float(input('Enter KD --> '))
+		test_count = int(input('How many tests to perform? --> '))
 		test_name_in = input('Test name for log files --> ')
 		if KP_in == 0 and KI_in == 0 and KD_in == 0:
 			config = Config()
