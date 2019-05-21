@@ -81,6 +81,11 @@ class BeamNG_Cruise_Controller_Test():
 			self.test_name = kwargs.get("test_name")
 		else:
 			self.test_name = "test"
+		if "targets" in keys:
+			self.targets = kwargs.get("targets")
+		else:
+			print("WARNING, no target speeds set")
+			self.targets = [0]
 	def setup_bngServer(self):
 		# Instantiate BeamNGpy instance running the simulator from the given path,
 		if ('BNG_HOME' in os.environ):
@@ -90,8 +95,6 @@ class BeamNG_Cruise_Controller_Test():
 				"WARNING no BNG_HOME is set! Make sure to set path to research\trunk\ as environment variable (or write the path in the script by yourself)")
 			self.bng = BeamNGpy('localhost', 64256, home='C:\\Users\\Ingars\\SVN\\trunk')
 	def setup_BeamNG(self):
-		
-
 		# Create a scenario in test map
 		scenario = Scenario('cruise-control', 'example')
 
@@ -103,8 +106,8 @@ class BeamNG_Cruise_Controller_Test():
 
 		# Add it to our scenario at this position and rotation
 		# scenario.add_vehicle(vehicle, pos=(-717, 101, 118), rot=(0, 0, 45))
-		scenario.add_vehicle(self.vehicle, pos=(406.787, 815.518, 0.214847),
-							 rot=(1, 0, 0))	 # spawn point for maps GridMap, GridMap2
+		scenario.add_vehicle(self.vehicle, pos=(406.787, 1115.518, 0),
+							 rot=(0, 0, 0))	 # spawn point for maps GridMap, GridMap2
 
 		# Place files defining our scenario for the simulator to read
 		scenario.make(self.bng)
@@ -118,22 +121,33 @@ class BeamNG_Cruise_Controller_Test():
 		self.bng.load_scenario(scenario)
 
 	def run(self):
-		i = 1
-		while i<=self.testing_times:
-			self.runTestNr(i)
-			i+=1
-
-	def runTestNr(self, nr):
 		self.setup_bngServer()
 		self.setup_BeamNG()
-		self.controller.newLogFile(self.test_name + "_" + str(nr) + ".txt")
 		self.bng.start_scenario()
+		for speed in self.targets:
+			self.controller.setTarget(speed)
+			self.controller.setTime(float(900/speed))
+			self.runTestsOfType("up_{0}_".format(speed), (406.787, 690.0 + float(100*(speed/10)), 0), (0, 0, 0))
+			self.runTestsOfType("straight_{0}_".format(speed), (406.787, 690.0 + float(100*(speed/10)), 0), (0, 0, 180))
+			self.runTestsOfType("down_{0}_".format(speed), (406.787, 257.871 - float(100*(speed/10)), 101), (0, 0, 180))
+		self.bng.close()
+
+	def runTestsOfType(self, type, pos, rot):
+		i = 1
+		while i<=self.testing_times:
+			self.controller.newLogFile(self.test_name + "_" + str(type) +"_" + str(i) + ".txt")
+			self.bng.restart_scenario()
+			self.bng.teleport_vehicle(self.vehicle, pos=pos, rot=rot)
+			self.runTest()
+			i+=1
+
+	def runTest(self):
 		self.controller.start()
 		while self.controller.ended==False:
 			start_time = datetime.datetime.now()
 			sensors = self.bng.poll_sensors(self.vehicle)
-			wheelspeed = sensors['electrics']['values']['wheelspeed']
-			value = self.controller.calculate_speed_with_logs(wheelspeed)
+			wheel_speed = sensors['electrics']['values']['wheelspeed']
+			value = self.controller.calculate_speed_with_logs(wheel_speed)
 			if value <= 0:
 				value = max(-1, value -0.1) * -1
 				self.vehicle.control(brake=value)
@@ -146,7 +160,7 @@ class BeamNG_Cruise_Controller_Test():
 			while (elapsed_time.total_seconds() * 1000) < 100:
 				elapsed_time = datetime.datetime.now() - start_time
 		print("Ending Test")
-		self.bng.close()
+
 
 
 class Cruise_Controller_Test():
@@ -156,26 +170,22 @@ class Cruise_Controller_Test():
 			self.controller = kwargs.get("controller")
 		else:
 			self.controller = PID_Controller()
-		if "filename" in keys:
-			self.filename = kwargs.get("filename")
+		if "test_time" in keys:
+			self.time = kwargs.get("test_time")
 		else:
-			self.filename = 'testLog.txt'
-		if "targets" in keys:
-			self.targets = kwargs.get("targets")
-		else:
-			print("WARNING, no target speeds set")
-			self.targets = [0]
-		if "target_times" in keys:
-			self.target_times = kwargs.get("target_times")
-		else:
-			print("WARNING, no target times set")
-			self.target_times = [0]
+			print("WARNING, no test time set")
+			self.time = 0
 		self.started = False
-		self.started_T = False
 		self.started_L = False
-		self.target_index = 0
 		self.ended = False
-		self.controller.config.target = self.targets[self.target_index]
+		self.target_speed = 0
+
+	def setTime(self,time):
+		self.time = time
+
+	def setTarget(self, speed):
+		self.target_speed=speed
+		self.controller.changeTarget(speed)
 
 	def newLogFile(self, filename):
 		self.filename = filename
@@ -190,7 +200,7 @@ class Cruise_Controller_Test():
 	def startLogging(self):
 		self.started_L = True
 		with open(self.filename, 'w+') as f:
-			f.write(formatLog(datetime.timedelta(seconds=0, microseconds=0), 0, self.targets[self.target_index]) + '\n')
+			f.write(formatLog(datetime.timedelta(seconds=0, microseconds=0), 0, self.target_speed) + '\n')
 
 	def startTimer(self):
 		self.started_T = True
@@ -203,25 +213,18 @@ class Cruise_Controller_Test():
 
 	def logSpeed(self, wheel_speed, elapsed_time):
 		with open(self.filename, 'a') as f:
-			f.write(formatLog(elapsed_time, wheel_speed, self.targets[self.target_index]) + '\n')
-		print(formatLog(elapsed_time, wheel_speed, self.targets[self.target_index]))
+			f.write(formatLog(elapsed_time, wheel_speed, self.target_speed) + '\n')
+		print(formatLog(elapsed_time, wheel_speed, self.target_speed))
 
 	def calculate_speed_with_logs(self, wheel_speed):
 		if self.started and self.ended==False:
 			elapsed_time = self.calculateElapsed()
-			end_time = sum(self.target_times[0:self.target_index + 1])
+			end_time = self.time
 			seconds_error = elapsed_time.seconds - end_time
 			if seconds_error >= 0:
-				if self.target_index + 1 == len(self.target_times):
-					self.ended = True
-					self.started = False
-					print("Timer has ended")
-					return 0
-				else:
-					self.target_index += 1
-					self.controller.config.target = self.targets[self.target_index]
-					print("Next target speed = {0}".format(self.targets[self.target_index]))
-					print("Timer was late by {0}.{1:06d} sec".format(seconds_error, elapsed_time.microseconds))
+				print("Timer has ended")
+				self.ended=True
+				return 0
 			self.logSpeed(wheel_speed, elapsed_time)
 			return self.controller.calculate_speed(wheel_speed)
 		else:
@@ -278,15 +281,10 @@ class On_Off_Controller():
 def main():
 		#If multiple Target Speeds are set, same amount of Test Times have to be specified
 
-		s_in = input('Set Speed (m/s)--> ')
-		s_list = s_in.split(",")
-		s = list(map(int, s_list))
-
-		t_in = input('Set Test Time (sec) --> ')
-		t_list = t_in.split(",")
-		t = list(map(int, t_list))
+		s_in = input('Set Speed (m/s)-->')
+		s_list = s_in.split(" ")
+		s = list(map(float, s_list))
 		KP_in = float(input('Enter KP --> '))
-
 		KI_in = float(input('Enter KI --> '))
 		KD_in = float(input('Enter KD --> '))
 		test_count = int(input('How many tests to perform? --> '))
@@ -297,11 +295,10 @@ def main():
 		else:
 			config = Config(KP=KP_in,KI=KI_in,KD=KD_in)
 			controller = PID_Controller(config=config)
-		test_controller = Cruise_Controller_Test(controller=controller, targets=s, target_times=t)
+		test_controller = Cruise_Controller_Test(controller=controller)
 		test = BeamNG_Cruise_Controller_Test(test_controller=test_controller, testing_times=test_count,
-		test_name="BeamNG_test_{0}".format(test_name_in))
+		test_name="BeamNG_test_{0}".format(test_name_in), targets=s)
 		test.run()
-
 
 def formatLog(elapsed_time, wheel_speed, target):
 	return '{2}.{3:06d}\t{0:.6f}\t{1:.6f}'.format(wheel_speed, target, elapsed_time.seconds, elapsed_time.microseconds)
