@@ -156,7 +156,7 @@ class BeamNG_Cruise_Controller_Test():
 	def runTestOfType(self, type, pos, rot):
 		i = 1
 		while i<=self.testing_times:
-			self.controller.newLogFile(self.test_name + "_" + str(type) +"_" + str(i) + ".txt")
+			self.controller.newLogFile("../logs/" +self.test_name + "_" + str(type) +"_" + str(i) + ".txt")
 			self.bng.restart_scenario()
 			self.bng.teleport_vehicle(self.vehicle, pos=pos, rot=rot)
 			self.run()

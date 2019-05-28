@@ -20,13 +20,13 @@ def main():
     best_of_p = [0.8,0.75,0.7,0.45]
     name = "BeamNG_Cruise_Control"
     for p in best_of_p:
-    i = 0
-    while round(i,2) <= 0.02:
-        d = 0
-        while round(d,2) <= 0.02:
-             beamNG.runTest([(p,i,d)], name)
-             d += 0.005
-         i += 0.005
+        i = 0
+        while round(i,2) <= 0.02:
+            d = 0
+            while round(d,2) <= 0.02:
+                 beamNG.runTest([(p,i,d)], name)
+                 d += 0.005
+            i += 0.005
 
     #Aizver serveri
     beamNG.close()
