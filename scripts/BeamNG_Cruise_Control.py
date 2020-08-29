@@ -97,8 +97,8 @@ class BeamNG_Cruise_Controller_Test():
 			self.bng = BeamNGpy('localhost', 64256, home=os.environ['BNG_HOME'])
 		else:
 			print(
-				"WARNING no BNG_HOME is set! Make sure to set path to research\trunk\ as environment variable (or write the path in the script by yourself)")
-			self.bng = BeamNGpy('localhost', 64256, home='C:\\Users\\Ingars\\SVN\\trunk')
+				"WARNING no BNG_HOME is set! Make sure to set BeamNG.research path to research\trunk\ as environment variable (or write the path in the script by yourself)")
+			self.bng = BeamNGpy('localhost', 64256, home='')
 	def setup_BeamNG(self):
 		# Create a scenario in test map
 		scenario = Scenario('cruise-control', 'example')
@@ -148,10 +148,10 @@ class BeamNG_Cruise_Controller_Test():
 	def runTestForPID(self):
 		for speed in self.targets:
 			self.controller.setTarget(speed)
-			self.controller.setTime(float(17))
-			self.runTestOfType("up_{0}_".format(speed), (406.787, 700.517, 0.214829), (0, 0, 0))
+			self.controller.setTime(float(30))
+			#self.runTestOfType("up_{0}_".format(speed), (406.787, 700.517, 0.214829), (0, 0, 0))
 			self.runTestOfType("straight_{0}_".format(speed), (406.787, 715.517, 0.214829), (0, 0, 180))
-			self.runTestOfType("down_{0}_".format(speed), (406.787, 304.896, 100.211), (0, 0, 180))
+			#self.runTestOfType("down_{0}_".format(speed), (406.787, 304.896, 100.211), (0, 0, 180))
 
 	def runTestOfType(self, type, pos, rot):
 		i = 1
@@ -270,6 +270,9 @@ class PID_Controller():
 
 	def change_target(self, target):
 		self.config.target = target
+
+	def get_target(self):
+		return self.config.target
 
 	def calculate_throttle(self, wheel_speed):
 		# Error
